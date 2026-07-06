@@ -13,28 +13,25 @@ app.use(express.json());
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "YOUR_GEMINI_API_KEY";
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-// هنخزن الكتب كـ مصفوفة فقرات مش كتلة واحدة عملاقة
 let ALL_BOOKS_PARAGRAPHS = [];
 
 async function loadAllPDFs() {
-  const booksFolder = "./books";
+  // process.cwd() مهمة جداً على فيرسيل عشان يوصل لجذر المشروع
+  const booksFolder = path.join(process.cwd(), "books"); 
   try {
     if (!fs.existsSync(booksFolder)) {
-      console.log("❌ خطأ: فولدر books مش موجود!");
+      console.log("❌ خطأ: فولدر books مش موجود في المسار الحالي!");
       return;
     }
     const files = fs
       .readdirSync(booksFolder)
       .filter((file) => file.endsWith(".pdf"));
-    console.log(
-      `📚 جاري تجهيز وفهرسة ${files.length} كتاب PDF... ثواني من فضلك.`,
-    );
+    console.log(`📚 جاري تجهيز وفهرسة ${files.length} كتاب PDF... ثواني من فضلك.`);
 
     for (const file of files) {
       const dataBuffer = fs.readFileSync(path.join(booksFolder, file));
       const pdfData = await pdf(dataBuffer);
 
-      // بنقسم كتاب الطالب لفقرات بناءً على السطور والمواضيع
       const paragraphs = pdfData.text
         .split("\n\n")
         .filter((p) => p.trim().length > 30);
@@ -46,15 +43,15 @@ async function loadAllPDFs() {
         });
       });
     }
-    console.log(
-      `✅ تم فهرسة ${ALL_BOOKS_PARAGRAPHS.length} فقرة تعليمية بنجاح! السيرفر مستعد.`,
-    );
+    console.log(`✅ تم فهرسة ${ALL_BOOKS_PARAGRAPHS.length} فقرة تعليمية بنجاح!`);
   } catch (error) {
     console.error("❌ حصلت مشكلة أثناء قراءة ملفات الـ PDF:", error);
   }
 }
 
-// دالة سحرية بتبحث في الـ 33 كتاب وتجيب الفقرات القريبة جداً من سؤال الطالب
+// استدعاء دالة قراءة الملفات لتجهيز المصفوفة فور تشغيل الـ Function
+loadAllPDFs();
+
 function getRelevantContext(userQuery, maxParagraphs = 5) {
   const keywords = userQuery
     .toLowerCase()
@@ -62,7 +59,6 @@ function getRelevantContext(userQuery, maxParagraphs = 5) {
     .filter((w) => w.length > 2);
   if (keywords.length === 0) return "";
 
-  // ترتيب الفقرات حسب عدد الكلمات المشتركة مع سؤال الطالب
   const scored = ALL_BOOKS_PARAGRAPHS.map((p) => {
     let score = 0;
     keywords.forEach((kw) => {
@@ -73,7 +69,6 @@ function getRelevantContext(userQuery, maxParagraphs = 5) {
     .filter((p) => p.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  // بناخد أفضل 5 فقرات بيتكلموا عن الموضوع بالظبط
   const topParagraphs = scored.slice(0, maxParagraphs);
 
   if (topParagraphs.length === 0)
@@ -89,7 +84,6 @@ app.post("/api/chat", async (req, res) => {
   if (!message) return res.status(400).json({ error: "المحتوى فارغ" });
 
   try {
-    // الفلترة الذكية بتحصل هنا في ثانية واحدة
     const relevantContext = getRelevantContext(message);
 
     const response = await ai.models.generateContent({
@@ -113,8 +107,5 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-const PORT = 3000;
-app.listen(PORT, async () => {
-  console.log(`🚀 السيرفر شغال دلوقتي على رابط: http://localhost:${PORT}`);
-  await loadAllPDFs();
-});
+// تصدير الـ app بدلاً من app.listen ليتوافق مع Vercel
+export default app;
