@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const chatMessages = document.getElementById("chat-messages");
 
   // الرابط بيكلم السيرفر المحلي بتاعك اللي قاري الـ 40 كتاب
-  const API_URL = "http://localhost:3000/api/chat";
+  const API_URL = "/api/chat";
 
   if (chatToggleBtn && chatBox && closeChat) {
     chatToggleBtn.addEventListener("click", () =>
